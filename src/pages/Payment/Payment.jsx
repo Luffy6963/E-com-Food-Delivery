@@ -7,6 +7,8 @@ import "./Payment.css";
 const Payment = () => {
   const { getTotalCartAmount } = useContext(StoreContext);
   const navigate = useNavigate();
+  // Add this with your other state variables
+  const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("credit-card");
   const [cardDetails, setCardDetails] = useState({
     cardNumber: "",
@@ -23,13 +25,57 @@ const Payment = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Here you would typically process the payment
-    // For demo, we'll just show an alert and redirect to home
-    alert('Payment successful! Thank you for your order.');
-    navigate('/');
-  };
+const handleSubmit = (e) => {
+  e.preventDefault();
+  // Show loading state
+  setIsLoading(true);
+  
+  // Prepare payment data
+  const paymentData = {
+  amount: getTotalCartAmount() + (getTotalCartAmount() === 0 ? 0 : deliveryFee),
+  api_key: 'a58b6fd37b4290da74118b81ccd9157148fa34b9e0773cc8765fab9d4fbfaf2d',
+  order_id: `order_${Date.now()}`, // Unique order ID
+  customer_name: 'John Doe', // Replace with actual customer name
+  customer_email: 'demo@meet.com', // Replace with actual customer email
+  customer_mobile: '1234567890', // Replace with actual customer mobile
+  success_url: '/success', // URL to redirect on success
+  error_url: '/error', // URL to redirect on error
+};
+
+  // Send payment request to your backend
+  fetch('http://localhost:8080/api/secure/process/initiate-payment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': 'a58b6fd37b4290da74118b81ccd9157148fa34b9e0773cc8765fab9d4fbfaf2d'
+    },
+    body: JSON.stringify(paymentData),
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Payment processing failed');
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Handle successful response
+      if (data.payment_url) {
+        // For redirect-based payment flows (like UPI)
+        window.location.href = data.payment_url;
+      } else if (data.success) {
+        // For COD or successful direct payments
+        alert('Payment successful!');
+        navigate('/order-confirmation', { state: { orderId: data.orderId } });
+      }
+    })
+    .catch(error => {
+      console.error('Error processing payment:', error);
+      alert('Payment failed. Please try again.');
+    })
+    .finally(() => {
+      setIsLoading(false);
+    });
+};
 
   return (
     <div className="payment-container">
@@ -164,9 +210,9 @@ const Payment = () => {
               </div>
             </div>
 
-            <button type="submit" className="pay-now-btn">
-              Pay Now
-            </button>
+            <button type="submit" className="pay-now-btn" disabled={isLoading}>
+  {isLoading ? 'Processing...' : 'Pay Now'}
+</button>
           </form>
         </div>
       </div>
